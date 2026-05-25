@@ -1,0 +1,12 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+joblib
+wordcloud
+pillow
+tensorflow
+streamlit
+transformers
+torch
