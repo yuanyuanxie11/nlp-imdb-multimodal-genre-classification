@@ -42,12 +42,12 @@ def clean_text(text: str, config: TextCleaningConfig | None = None) -> str:
         value = value.lower()
     if config.strip_html:
         value = re.sub(r"<[^>]+>", " ", value)
-    value = re.sub(r"http\\S+|www\\.\\S+", " ", value)
-    value = re.sub(r"[^a-z0-9\\s']", " ", value) if config.remove_punctuation else value
+    value = re.sub(r"http\S+|www\.\S+", " ", value)
+    value = re.sub(r"[^a-z0-9\s']", " ", value) if config.remove_punctuation else value
     if config.remove_stopwords:
         value = " ".join(token for token in value.split() if token not in STOPWORDS)
     if config.collapse_whitespace:
-        value = re.sub(r"\\s+", " ", value).strip()
+        value = re.sub(r"\s+", " ", value).strip()
     return value
 
 

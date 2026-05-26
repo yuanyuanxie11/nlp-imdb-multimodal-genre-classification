@@ -46,6 +46,22 @@ def build_model(num_classes: int, config: LSTMConfig) -> tf.keras.Model:
     return model
 
 
+def plot_model_architecture(model: tf.keras.Model, output_dir: Path) -> None:
+    """Save a visual diagram of the model architecture using plot_model."""
+    try:
+        tf.keras.utils.plot_model(
+            model,
+            to_file=str(output_dir / "figures" / "lstm_architecture.png"),
+            show_shapes=True,
+            show_layer_names=True,
+            rankdir="TB",
+            dpi=150,
+        )
+    except Exception as exc:
+        # plot_model requires pydot + graphviz; fall back gracefully
+        print(f"[warn] plot_model unavailable ({exc}); skipping architecture diagram.")
+
+
 def plot_history(history: tf.keras.callbacks.History, output_dir: Path) -> None:
     history_df = pd.DataFrame(history.history)
     history_df.to_csv(output_dir / "tables" / "lstm_history.csv", index=False)
@@ -103,6 +119,7 @@ def main() -> None:
     labels = encoder.classes_.tolist()
 
     model = build_model(len(labels), config)
+    plot_model_architecture(model, Path(output_dir))
     early_stop = EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)
     history = model.fit(
         x_train,
