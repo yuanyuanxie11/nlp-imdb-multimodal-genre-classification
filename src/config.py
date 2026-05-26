@@ -12,6 +12,22 @@ class SplitConfig:
 
 
 @dataclass(frozen=True)
+class CVConfig:
+    # K for the primary Stratified K-Fold loop used by baselines and (optionally) the LSTM.
+    n_splits: int = 5
+    # Outer/inner K for nested CV (outer = honest generalisation, inner = hyperparameter search).
+    outer_splits: int = 5
+    inner_splits: int = 3
+    # Seeds used by multi-seed stability sweeps. Three is the minimum to compute a meaningful std.
+    # 💡 tuple (not list) because frozen dataclasses can't hold mutable defaults.
+    seeds: tuple[int, ...] = (13, 42, 2024)
+    # Metrics tracked across every fold. Macro-F1 is the primary headline for imbalanced multi-class.
+    scoring: tuple[str, ...] = ("accuracy", "f1_macro", "f1_weighted")
+    # n_jobs=-1 → use all cores. Set to 1 if you hit memory issues on small machines.
+    n_jobs: int = -1
+
+
+@dataclass(frozen=True)
 class TextCleaningConfig:
     lowercase: bool = True
     strip_html: bool = True

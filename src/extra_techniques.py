@@ -67,11 +67,14 @@ def tsne_embedding_plot(
     svd = TruncatedSVD(n_components=n_components_svd, random_state=random_state)
     reduced = svd.fit_transform(tfidf_matrix)
 
+    # ⚠ sklearn 1.7+ renamed `n_iter` → `max_iter`. The deprecated alias was
+    # removed entirely in 1.7, so we must use the new name. If you ever pin
+    # sklearn < 1.2, switch this back to `n_iter=1000`.
     tsne = TSNE(
         n_components=2,
         perplexity=min(perplexity, len(texts) - 1),
         random_state=random_state,
-        n_iter=1000,
+        max_iter=1000,
         init="pca",
         learning_rate="auto",
     )

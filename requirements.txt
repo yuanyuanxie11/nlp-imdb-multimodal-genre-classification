@@ -10,3 +10,21 @@ tensorflow
 streamlit
 transformers
 torch
+
+# ─── EDA add-ons ─────────────────────────────────────────────────────────
+# textstat:   enables readability_metrics() in src/eda_advanced.py.
+#             Without it, that function prints a warning and skips.
+textstat
+# requests:   used by src/eda_images.fetch_from_tmdb when TMDB_API_KEY is set.
+#             Without it, the TMDB fetch path skips with a warning.
+requests
+# nbformat:   only needed if you regenerate notebook cells programmatically.
+nbformat
+# spacy:      optional — enables pos_and_entity_distribution() in eda_advanced.
+#             Also needs: python -m spacy download en_core_web_sm
+# spacy
+# datasketch: optional — enables near-duplicate detection in duplicate_and_quality_report.
+#             Currently the function falls back to exact-text duplicates without it.
+# datasketch
+# kaggle:     optional — only if you want to fetch posters from Kaggle.
+# kaggle
