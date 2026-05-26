@@ -109,12 +109,15 @@ def lstm_gradient_saliency(
     config = json.loads(config_path.read_text())
     max_len = config.get("max_len", 250)
 
-    # Build a sub-model that outputs (embedding_output, final_logits)
-    embedding_layer = model.layers[0]  # Embedding is always first
-    grad_model = tf.keras.Model(
-        inputs=model.inputs,
-        outputs=[embedding_layer.output, model.output],
-    )
+    # ⚠ Keras 3 (TF 2.16+) does NOT expose `model.output` / `layer.output` for
+    # a Sequential model that has only been loaded from disk — those Functional-API
+    # attributes only exist after the model has been called at least once. Rather
+    # than rely on them, we drive the forward pass layer-by-layer ourselves below.
+    # We still trigger one dummy call to register inbound nodes so any
+    # introspection later (e.g. model.summary()) works.
+    _ = model(tf.zeros((1, max_len), dtype=tf.int32))
+    embedding_layer = model.layers[0]      # Embedding is always first
+    remaining_layers = model.layers[1:]    # LSTM, Dense, Dropout, Dense (softmax)
 
     # Accumulate word-level importance per class: {class_name: {word: total_score}}
     class_word_scores: dict[str, dict[str, float]] = {c: {} for c in class_names}
@@ -131,9 +134,17 @@ def lstm_gradient_saliency(
         x = tf.constant(padded, dtype=tf.int32)
 
         class_idx = class_names.index(label)
+        # 💡 Manual forward pass so we can watch the embedding output without
+        # constructing a Functional submodel. Each `layer(h, training=False)`
+        # call is just `layer.__call__`, which works on any Keras layer
+        # regardless of how the parent model was built.
         with tf.GradientTape() as tape:
-            emb_out, logits = grad_model(x, training=False)
+            emb_out = embedding_layer(x)
             tape.watch(emb_out)
+            h = emb_out
+            for layer in remaining_layers:
+                h = layer(h, training=False)
+            logits = h
             loss = logits[0, class_idx]
 
         grads = tape.gradient(loss, emb_out)
