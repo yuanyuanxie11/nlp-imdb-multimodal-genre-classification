@@ -71,7 +71,7 @@ def tsne_embedding_plot(
         n_components=2,
         perplexity=min(perplexity, len(texts) - 1),
         random_state=random_state,
-        n_iter=1000,
+        max_iter=1000,
         init="pca",
         learning_rate="auto",
     )
