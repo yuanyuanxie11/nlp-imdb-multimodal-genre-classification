@@ -23,8 +23,8 @@ class CVConfig:
     seeds: tuple[int, ...] = (13, 42, 2024)
     # Metrics tracked across every fold. Macro-F1 is the primary headline for imbalanced multi-class.
     scoring: tuple[str, ...] = ("accuracy", "f1_macro", "f1_weighted")
-    # n_jobs=-1 → use all cores. Set to 1 if you hit memory issues on small machines.
-    n_jobs: int = -1
+    # Single-process CV avoids joblib/loky semaphore issues in restricted environments.
+    n_jobs: int = 1
 
 
 @dataclass(frozen=True)
