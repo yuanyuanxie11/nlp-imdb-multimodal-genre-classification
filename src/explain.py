@@ -9,7 +9,6 @@ import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from wordcloud import WordCloud
 
 from .config import ensure_dir
 from .data_processing import STOPWORDS, add_clean_columns, clean_text, load_dataset, stratified_split
@@ -28,17 +27,32 @@ def top_features_from_linear_pipeline(pipeline, top_n: int = 15) -> pd.DataFrame
     model = pipeline.named_steps["model"]
     feature_names = vectorizer.get_feature_names_out()
 
-    if not hasattr(model, "coef_"):
+    if hasattr(model, "calibrated_classifiers_"):
+        calibrated_estimators = [
+            calibrated.estimator
+            for calibrated in model.calibrated_classifiers_
+            if hasattr(calibrated.estimator, "coef_")
+        ]
+        if not calibrated_estimators:
+            raise ValueError("Calibrated model does not expose fitted linear estimators.")
+        scores = np.mean([estimator.coef_ for estimator in calibrated_estimators], axis=0)
+        classes = model.classes_
+    elif not hasattr(model, "coef_"):
         if hasattr(model, "feature_log_prob_"):
             scores = model.feature_log_prob_
+            classes = model.classes_
         else:
             raise ValueError("Model does not expose linear coefficients.")
     else:
         scores = model.coef_
+        classes = model.classes_
 
     rows = []
-    for class_index, class_name in enumerate(model.classes_):
-        class_scores = scores[class_index]
+    for class_index, class_name in enumerate(classes):
+        if scores.shape[0] == 1 and len(classes) == 2:
+            class_scores = -scores[0] if class_index == 0 else scores[0]
+        else:
+            class_scores = scores[class_index]
         top_ids = class_scores.argsort()[-top_n:][::-1]
         for rank, feature_id in enumerate(top_ids, start=1):
             rows.append(
@@ -53,6 +67,12 @@ def top_features_from_linear_pipeline(pipeline, top_n: int = 15) -> pd.DataFrame
 
 
 def save_wordclouds(feature_df: pd.DataFrame, output_dir: Path) -> None:
+    try:
+        from wordcloud import WordCloud
+    except ImportError:
+        print("[warn] wordcloud not available; skipping wordcloud figures.")
+        return
+
     output_dir.mkdir(parents=True, exist_ok=True)
     for class_name, group in feature_df.groupby("class"):
         frequencies = {row["feature"]: max(row["score"], 0.001) for _, row in group.iterrows()}

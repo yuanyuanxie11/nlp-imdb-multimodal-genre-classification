@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Iterable
 
 from .runtime import prepare_runtime, set_global_seed
 
@@ -41,12 +40,14 @@ from tensorflow.keras.layers import (
     MaxPooling1D,
 )
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.optimizers import Adam
+try:
+    from tensorflow.keras.optimizers.legacy import Adam
+except ImportError:
+    from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.preprocessing.text import Tokenizer
 
-from .config import LSTMConfig, SplitConfig, ensure_dir
-from .cross_validation import make_stratified_kfold
+from .config import LSTMConfig, ensure_dir
 from .data_processing import add_clean_columns, load_dataset, stratified_split
 from .evaluate import compute_metrics, save_confusion_matrix, save_metrics
 
@@ -407,6 +408,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--glove-path",   default="data/glove.6B.100d.txt",
                         help="Path to GloVe vectors. Download with: python -m scripts.download_glove")
     parser.add_argument("--epochs",       type=int, default=20)
+    parser.add_argument("--max-len",      type=int, default=250)
     parser.add_argument("--no-glove",     action="store_true",
                         help="Skip GloVe loading and use random embeddings.")
     return parser.parse_args()
@@ -421,24 +423,18 @@ def main() -> None:
 
     config = LSTMConfig(
         epochs=args.epochs,
+        max_len=args.max_len,
         glove_path=args.glove_path,
         use_glove=not args.no_glove,
     )
 
     # ── Data ──────────────────────────────────────────────────────────────────
+    set_global_seed(42)
     df = add_clean_columns(load_dataset(args.input), args.text_column)
+    train_df, val_df, test_df = stratified_split(df, args.label_column)
 
-    # Mode 1 + 2: single canonical run (always), plus optional extra seeds.
-    seeds: Iterable[int] = args.seeds if args.seeds else [42]
-    rows = []
-    for i, seed in enumerate(seeds):
-        save_artifacts = (i == 0)  # Only the first seed produces the canonical model.
-        print(f"\n=== LSTM run with seed={seed} (save_artifacts={save_artifacts}) ===")
-        rows.append(train_one_run(
-            df, args.label_column, args.text_column,
-            config, seed, Path(output_dir), model_dir,
-            save_artifacts=save_artifacts,
-        ))
+    tokenizer = Tokenizer(num_words=config.max_words, oov_token="<OOV>")
+    tokenizer.fit_on_texts(train_df["text_clean_neural"])
 
     def vectorize(texts):
         seqs = tokenizer.texts_to_sequences(texts)

@@ -23,6 +23,7 @@ import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
@@ -70,7 +71,7 @@ def logistic_regression_factory() -> Pipeline:
 def linear_svm_factory() -> Pipeline:
     return Pipeline([
         ("tfidf", TfidfVectorizer(**_common_vectorizer_kwargs())),
-        ("model", LinearSVC()),
+        ("model", CalibratedClassifierCV(LinearSVC(), cv=3)),
     ])
 
 
@@ -90,7 +91,7 @@ _SHARED_TFIDF_GRID = {
 PARAM_GRIDS: dict[str, dict] = {
     "naive_bayes": {**_SHARED_TFIDF_GRID, "model__alpha": [0.1, 0.5, 1.0]},
     "logistic_regression": {**_SHARED_TFIDF_GRID, "model__C": [0.1, 1.0, 10.0]},
-    "linear_svm": {**_SHARED_TFIDF_GRID, "model__C": [0.1, 1.0, 10.0]},
+    "linear_svm": {**_SHARED_TFIDF_GRID, "model__estimator__C": [0.1, 1.0, 10.0]},
 }
 
 
