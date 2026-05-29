@@ -19,8 +19,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Iterable
-
 from .runtime import prepare_runtime, set_global_seed
 
 prepare_runtime()
@@ -36,7 +34,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from tensorflow.keras.layers import Dense, Dropout, GlobalAveragePooling2D
 from tensorflow.keras.models import Model
 
-from .config import ensure_dir
+from .config import SplitConfig, ensure_dir
 from .data_processing import stratified_split
 from .evaluate import compute_metrics, save_confusion_matrix, save_metrics
 
@@ -254,6 +252,9 @@ def train_image_classifier(
     # ── Save model ────────────────────────────────────────────────────────────
     model.save(Path(model_dir) / "image_genre_classifier.keras")
     (Path(model_dir) / "image_label_classes.json").write_text(json.dumps(labels, indent=2))
+    (Path(model_dir) / "image_config.json").write_text(
+        json.dumps({"image_size": list(image_size)}, indent=2)
+    )
 
     print(f"\n[image] Test accuracy: {metrics['accuracy']:.4f}  "
           f"Macro-F1: {metrics['macro_f1']:.4f}")
@@ -320,7 +321,7 @@ def train_one_run(
     val_ds = _make_dataset(val_df, image_column, image_size, shuffle=False, seed=seed)
     test_ds = _make_dataset(test_df, image_column, image_size, shuffle=False, seed=seed)
 
-    model = build_image_model(image_size, len(encoder.classes_))
+    model = build_image_model(len(encoder.classes_), image_size)
     history = model.fit(
         train_ds, validation_data=val_ds, epochs=epochs,
         callbacks=[EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)],
@@ -351,6 +352,9 @@ def train_one_run(
         plt.close()
         model.save(model_dir / "image_genre_classifier.keras")
         (model_dir / "image_label_classes.json").write_text(json.dumps(labels, indent=2))
+        (model_dir / "image_config.json").write_text(
+            json.dumps({"image_size": list(image_size)}, indent=2)
+        )
 
     return {
         "seed": seed,

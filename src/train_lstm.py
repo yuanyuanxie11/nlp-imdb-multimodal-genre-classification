@@ -527,6 +527,24 @@ def main() -> None:
         "lstm_prediction":  test_preds.tolist(),
     }).to_csv(Path(output_dir) / "tables" / "lstm_predictions.csv", index=False)
 
+    comparison_path = Path(output_dir) / "tables" / "model_comparison.csv"
+    lstm_row = pd.DataFrame([{
+        "model": "lstm",
+        "accuracy": metrics["accuracy"],
+        "macro_f1": metrics["macro_f1"],
+        "weighted_f1": metrics["weighted_f1"],
+    }])
+    if comparison_path.exists():
+        comparison = pd.read_csv(comparison_path)
+        comparison = comparison[comparison["model"] != "lstm"]
+        comparison = pd.concat([comparison, lstm_row], ignore_index=True)
+        sort_cols = [col for col in ["accuracy", "macro_f1"] if col in comparison.columns]
+        if sort_cols:
+            comparison = comparison.sort_values(by=sort_cols, ascending=False, ignore_index=True)
+    else:
+        comparison = lstm_row
+    comparison.to_csv(comparison_path, index=False)
+
     print(json.dumps({k: v for k, v in metrics.items() if k != "report"}, indent=2))
 
 
