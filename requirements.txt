@@ -1,12 +1,43 @@
+# ── Python version ─────────────────────────────────────────────────────────────
+# TensorFlow does NOT support Python 3.13+.
+# Use Python 3.11 (recommended):
+#   conda create -n genre-clf python=3.11 -y
+#   conda activate genre-clf
+#   pip install -r requirements.txt
+
+# ── Core data / ML ─────────────────────────────────────────────────────────────
 pandas
-numpy
+numpy==1.26.4      # TF 2.15 requires NumPy 1.x — NumPy 2.x breaks ml_dtypes
 scikit-learn
 matplotlib
 seaborn
 joblib
+
+# ── NLP utilities ──────────────────────────────────────────────────────────────
 wordcloud
 pillow
-tensorflow
-streamlit
+shap==0.42.1       # 0.45+ pulls in numba which upgrades numpy to 2.x, breaking TF
+
+# ── Model visualization (plot_model) ───────────────────────────────────────────
+pydot==1.4.2       # TF 2.15 / Keras 2.15 break with pydot 4.x; also needs system Graphviz:
+                   #   macOS: brew install graphviz
+
+# ── Deep learning ──────────────────────────────────────────────────────────────
+# Intel Mac + Python 3.11: use TF 2.15 (last version built against NumPy 1.x)
+# Apple Silicon          : replace tensorflow with tensorflow-macos tensorflow-metal
+tensorflow==2.15.0  # last version built against NumPy 1.x on Intel Mac
+# ml_dtypes is pinned automatically by TF (==0.2.x) — do not pin it manually
+
+# ── Transformer / optional summarizer ─────────────────────────────────────────
 transformers
 torch
+
+# ── App ───────────────────────────────────────────────────────────────────────
+streamlit
+
+# ─── EDA add-ons (Eason's advanced EDA module) ───────────────────────────────
+textstat           # readability metrics — optional, degrades gracefully if missing
+requests           # TMDB poster fetch — optional
+nbformat           # notebook cell regeneration — optional
+# spacy            # optional: python -m spacy download en_core_web_sm
+# datasketch       # optional: near-duplicate detection

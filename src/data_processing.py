@@ -13,16 +13,32 @@ prepare_runtime()
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 from sklearn.model_selection import train_test_split
 
 from .config import SplitConfig, TextCleaningConfig, ensure_dir
 
-STOPWORDS = {
-    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
-    "he", "in", "is", "it", "its", "of", "on", "that", "the", "to", "was",
-    "were", "will", "with", "this", "their", "his", "her", "they", "them",
-    "after", "before", "into", "over", "under", "about", "while", "through",
+# 💡 sklearn ships a 318-word English stopword list. Using it (instead of a
+# hand-rolled 36-word set) removes high-frequency pronouns / auxiliaries /
+# prepositions like "she", "him", "when", "but" that were drowning out the
+# real signal in LDA topics and downstream bag-of-words models.
+# ⚠️ ENGLISH_STOP_WORDS is a frozenset — wrap it in a mutable set before
+# adding domain words.
+DOMAIN_STOPWORDS = {
+    # Movie-plot filler that is genre-agnostic and adds no discriminative signal.
+    # Add or remove items here when EDA surfaces new noise.
+    "film", "movie", "story", "life", "lives", "live",
+    "year", "years", "day", "days", "night", "time",
+    "one", "two", "three", "first", "second",
+    "young", "old", "new",
+    "man", "woman", "men", "women", "people", "person",
+    "find", "finds", "found", "tell", "tells", "told",
+    "say", "says", "said", "go", "goes", "went", "get", "gets", "got",
+    "make", "makes", "made", "take", "takes", "took",
+    "back", "way", "world",
 }
+
+STOPWORDS = set(ENGLISH_STOP_WORDS) | DOMAIN_STOPWORDS
 
 
 def load_dataset(input_path: str | Path) -> pd.DataFrame:
@@ -52,14 +68,25 @@ def clean_text(text: str, config: TextCleaningConfig | None = None) -> str:
 
 
 def basic_profile(df: pd.DataFrame, text_column: str, label_column: str) -> dict:
+    """Lightweight dataset profile. Backward-compatible: new keys added, none removed/renamed."""
     text_series = df[text_column].fillna("").astype(str)
     token_counts = text_series.str.split().map(len)
+    char_counts = text_series.str.len()
+    # Cheap sentence count → split on .!? without dragging in heavy NLP tooling.
+    sentence_counts = text_series.map(lambda s: len(re.findall(r"[.!?]+", s)) if s else 0)
     label_counts = df[label_column].value_counts(dropna=False).to_dict()
+    total_labels = int(df[label_column].notna().sum())
+    label_pct = {
+        str(k): float(v) / total_labels * 100 if total_labels else 0.0
+        for k, v in label_counts.items()
+    }
     vocab = Counter()
     for tokens in text_series.str.lower().str.split():
         vocab.update(tokens)
+    total_tokens = sum(vocab.values()) or 1
 
     return {
+        # ---- legacy keys (unchanged) ----
         "rows": int(df.shape[0]),
         "columns": int(df.shape[1]),
         "column_names": df.columns.tolist(),
@@ -73,6 +100,22 @@ def basic_profile(df: pd.DataFrame, text_column: str, label_column: str) -> dict
             "max": int(token_counts.max()),
         },
         "top_words_before_cleaning": vocab.most_common(30),
+        # ---- new keys (additive only) ----
+        "summary_char_count": {
+            "mean": float(char_counts.mean()),
+            "median": float(char_counts.median()),
+            "min": int(char_counts.min()),
+            "max": int(char_counts.max()),
+        },
+        "sentence_count": {
+            "mean": float(sentence_counts.mean()),
+            "median": float(sentence_counts.median()),
+            "min": int(sentence_counts.min()),
+            "max": int(sentence_counts.max()),
+        },
+        "label_distribution_pct": label_pct,
+        "null_label_count": int(df[label_column].isna().sum()),
+        "unique_word_ratio": float(len(vocab) / total_tokens),  # corpus-level type/token ratio
     }
 
 
@@ -90,11 +133,30 @@ def add_clean_columns(df: pd.DataFrame, text_column: str) -> pd.DataFrame:
     return enriched
 
 
-def save_eda_artifacts(df: pd.DataFrame, text_column: str, label_column: str, output_dir: str | Path) -> None:
+def save_eda_artifacts(
+    df: pd.DataFrame,
+    text_column: str,
+    label_column: str,
+    output_dir: str | Path,
+    *,
+    run_advanced: bool = True,
+) -> None:
+    """Generate the full EDA artifact set.
+
+    Legacy artifacts (genre_distribution.png, summary_length_distribution.png,
+    word_count_by_genre.csv, dataset_preview.csv) are always produced for
+    backward compatibility.
+
+    When ``run_advanced=True`` (default), also calls into ``eda_advanced`` to
+    produce the deeper analyses (n-grams, distinctive terms, vocab uniqueness,
+    quality report, OOV curve, class overlap, cleaning impact, readability,
+    POS/entity — last two are graceful no-ops without their optional deps).
+    """
     output_dir = ensure_dir(output_dir)
     figures_dir = ensure_dir(output_dir / "figures")
     tables_dir = ensure_dir(output_dir / "tables")
 
+    # ---- legacy artifacts (unchanged outputs) ----
     plt.figure(figsize=(8, 5))
     sns.countplot(data=df, x=label_column, order=df[label_column].value_counts().index)
     plt.title("Genre Distribution")
@@ -118,6 +180,36 @@ def save_eda_artifacts(df: pd.DataFrame, text_column: str, label_column: str, ou
     )
     by_genre.to_csv(tables_dir / "word_count_by_genre.csv", index=False)
     df.head(20).to_csv(tables_dir / "dataset_preview.csv", index=False)
+
+    if not run_advanced:
+        return
+
+    # ---- advanced artifacts (delegate to src.eda_advanced) ----
+    # 💡 Lazy import → avoids a circular-import risk and keeps `data_processing`
+    # importable even if a downstream user strips eda_advanced.
+    try:
+        from . import eda_advanced as ea
+    except ImportError as exc:
+        print(f"[data_processing] eda_advanced unavailable ({exc}); skipping advanced EDA.")
+        return
+
+    # The classical-cleaned column is what baselines actually see, so most
+    # linguistic analyses use that. Raw column is used for quality checks.
+    classical_col = "text_clean_classical" if "text_clean_classical" in df.columns else text_column
+    neural_col = "text_clean_neural" if "text_clean_neural" in df.columns else text_column
+
+    ea.duplicate_and_quality_report(df, text_column, label_column, output_dir)
+    ea.length_outliers(df, text_column, label_column, output_dir)
+    ea.ngram_frequency(df, classical_col, label_column, output_dir)
+    ea.tfidf_top_terms_per_genre(df, classical_col, label_column, output_dir)
+    ea.vocabulary_uniqueness(df, classical_col, label_column, output_dir)
+    ea.class_overlap_text(df, classical_col, label_column, output_dir)
+    ea.oov_curve(df, text_column, label_column, output_dir)
+    if {classical_col, neural_col, text_column} <= set(df.columns):
+        ea.cleaning_pipeline_impact(df, text_column, classical_col, neural_col, label_column, output_dir)
+    # These two no-op gracefully if their optional deps are missing.
+    ea.readability_metrics(df, text_column, label_column, output_dir)
+    ea.pos_and_entity_distribution(df, text_column, label_column, output_dir)
 
 
 def stratified_split(
