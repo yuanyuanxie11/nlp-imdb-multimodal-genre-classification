@@ -1,0 +1,31 @@
+name: imdb-genre-classification
+
+services:
+  imdb-genre-app:
+    build: .
+    image: imdb-genre-classification:latest
+    ports:
+      - "8501:8501"
+    environment:
+      TF_CPP_MIN_LOG_LEVEL: "2"
+      TF_FORCE_GPU_ALLOW_GROWTH: "true"
+      PYTHONPATH: /app
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+    command: scripts/docker_start.sh
+
+  train:
+    profiles: ["manual"]
+    build: .
+    image: imdb-genre-classification:latest
+    environment:
+      TF_CPP_MIN_LOG_LEVEL: "2"
+      TF_FORCE_GPU_ALLOW_GROWTH: "true"
+      PYTHONPATH: /app
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+    command: python -m src.pipeline

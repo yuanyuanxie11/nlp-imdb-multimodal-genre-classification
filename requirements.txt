@@ -6,16 +6,18 @@
 #   pip install -r requirements.txt
 
 # ── Core data / ML ─────────────────────────────────────────────────────────────
-pandas
+pandas==2.2.2
 numpy==1.26.4      # TF 2.15 requires NumPy 1.x — NumPy 2.x breaks ml_dtypes
-scikit-learn
-matplotlib
-seaborn
-joblib
+scikit-learn==1.5.2
+matplotlib==3.9.2
+seaborn==0.13.2
+joblib==1.4.2
+pyarrow==17.0.0
+kagglehub==0.3.4
 
 # ── NLP utilities ──────────────────────────────────────────────────────────────
-wordcloud
-pillow
+wordcloud==1.9.3
+pillow==10.4.0
 shap==0.42.1       # 0.45+ pulls in numba which upgrades numpy to 2.x, breaking TF
 
 # ── Model visualization (plot_model) ───────────────────────────────────────────
@@ -29,15 +31,15 @@ tensorflow==2.15.0  # last version built against NumPy 1.x on Intel Mac
 # ml_dtypes is pinned automatically by TF (==0.2.x) — do not pin it manually
 
 # ── Transformer / optional summarizer ─────────────────────────────────────────
-transformers
-torch
+transformers==4.44.2
+torch==2.6.0
 
 # ── App ───────────────────────────────────────────────────────────────────────
-streamlit
+streamlit==1.38.0
 
 # ─── EDA add-ons (Eason's advanced EDA module) ───────────────────────────────
-textstat           # readability metrics — optional, degrades gracefully if missing
-requests           # TMDB poster fetch — optional
-nbformat           # notebook cell regeneration — optional
+textstat==0.7.13   # readability metrics — optional, degrades gracefully if missing
+requests==2.34.2   # TMDB poster fetch — optional
+nbformat==5.10.4   # notebook cell regeneration — optional
 # spacy            # optional: python -m spacy download en_core_web_sm
 # datasketch       # optional: near-duplicate detection

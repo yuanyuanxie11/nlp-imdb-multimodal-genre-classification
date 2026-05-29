@@ -1,6 +1,6 @@
-# NLP IMDB Multimodal Genre Classification
+# NLP IMDB Genre Classification
 
-This repository is our team workspace for the Northwestern Text Analytics final project. We are building a movie genre classification system that uses plot summaries as the core signal and leaves room for a bonus multimodal extension using poster images.
+This repository is our team workspace for the Northwestern Text Analytics final project. We are building a movie genre classification system that uses plot summaries as the core signal and leaves room for a bonus poster-image extension.
 
 Our goal is not just to complete the assignment. We want to build something polished, interpretable, collaborative, and demo-friendly enough to stand out in both technical quality and presentation.
 
@@ -23,7 +23,7 @@ This dataset gives us a strong story:
 - different genres use different lexical and emotional patterns
 - classical models may be surprisingly strong
 - neural models may capture context and sequence better
-- poster images can provide a meaningful bonus multimodal comparison
+- poster images can provide a meaningful bonus comparison
 
 That means we can deliver more than just accuracy numbers. We can deliver insight.
 
@@ -87,6 +87,68 @@ If the actual dataset uses different column names, pass them through the command
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+## Docker Setup
+
+The Docker image uses Python 3.11 and pinned dependency versions. TensorFlow and PyTorch use GPU when Docker exposes one, otherwise they fall back to CPU.
+
+Build the image:
+
+```bash
+docker build -t imdb-genre-classification:latest .
+```
+
+Run the Streamlit demo:
+
+```bash
+docker run --rm -p 8501:8501 \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/models:/app/models" \
+  -v "$PWD/outputs:/app/outputs" \
+  imdb-genre-classification:latest
+```
+
+Or use Compose:
+
+```bash
+docker compose up --build
+```
+
+On a machine with NVIDIA Container Toolkit and a compatible GPU, use the GPU override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
+```
+
+This runs the full training pipeline first, including text preprocessing, the three baseline models, the TensorFlow LSTM, the poster image classifier, and explanation artifacts. When training finishes, Streamlit starts on port `8501`.
+
+Download the Kaggle dataset and run preprocessing, baseline training, LSTM training, poster image training, and explanation generation:
+
+```bash
+docker compose run --rm train
+```
+
+For a faster smoke run that skips the LSTM:
+
+```bash
+docker compose run --rm train python -m src.pipeline --skip-lstm --skip-image
+```
+
+Run project scripts inside the same environment:
+
+```bash
+docker run --rm \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/models:/app/models" \
+  -v "$PWD/outputs:/app/outputs" \
+  imdb-genre-classification:latest \
+  python -m src.train_baselines \
+    --input data/movies.csv \
+    --text-column summary \
+    --label-column genre \
+    --output-dir outputs \
+    --model-dir models
 ```
 
 ## Workflow
@@ -254,7 +316,7 @@ Focus:
 How this person makes the project better:
 
 - gives the project technical depth
-- enables the optional multimodal comparison
+- enables the optional poster-image comparison
 - can test whether fusion improves performance
 
 ### Person 5: App, Presentation, and Integration Lead
@@ -280,7 +342,7 @@ If we want this project to feel exceptional rather than merely complete, these a
 - add topic modeling by genre
 - visualize text embeddings in 2D
 - build a poster-image classifier
-- combine text and image predictions for multimodal fusion
+- compare text and image predictions side by side
 - create a taxonomy of model errors
 - highlight movies where models strongly disagree
 - compare human intuition to model predictions on a few examples

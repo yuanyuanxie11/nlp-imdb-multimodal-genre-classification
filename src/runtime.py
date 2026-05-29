@@ -6,7 +6,11 @@ from pathlib import Path
 
 
 def prepare_runtime() -> None:
-    """Set writable cache locations for plotting libraries in sandboxed environments."""
+    """Set cache paths and let ML frameworks use GPU when Docker exposes one."""
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    os.environ.setdefault("TRANSFORMERS_NO_TF32", "1")
+    os.environ.setdefault("TF_FORCE_GPU_ALLOW_GROWTH", "true")
+
     cache_dir = Path.cwd() / ".cache"
     mpl_dir = cache_dir / "matplotlib"
     font_dir = cache_dir / "fontconfig"
